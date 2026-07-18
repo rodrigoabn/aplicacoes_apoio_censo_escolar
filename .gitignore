@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.streamlit/secrets.toml
+apps/web_scrapling/docs/credenciais.json
+credenciais.json
+docs_temporarios/
+.DS_Store
+
+# Evitar subir planilhas de dados locais ou logs
+*.xlsx
+*.xls
+*.csv
+*.log
