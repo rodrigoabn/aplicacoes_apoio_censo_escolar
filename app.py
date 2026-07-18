@@ -5,8 +5,6 @@ import streamlit as st
 import base64
 from PIL import Image
 from apps.inicio.inicio import show_home_page
-from apps.divisor_turmas.divisor import show_divisor_page
-from apps.divisor_profissionais.divisor_prof import show_divisor_prof_page
 
 # ---------------------------------------------------------------------------
 # Registro da aplicação "COLETA DE DADOS CADASTRAIS DAS ESCOLAS" como pacote importável (src)
@@ -604,10 +602,6 @@ _MENU_GROUPS = {
         "Relatórios de Profissionais Escolares",
         "Recibos de Fechamento (1ª Etapa)",
     ],
-    "Melhorias em relatórios": [
-        "Relatórios de Alunos (Organizar por Turma)",
-        "Relatórios de Profissionais Escolares (Organizar por Turma)",
-    ],
 }
 
 if "nav_page" not in st.session_state:
@@ -658,10 +652,4 @@ elif page in ("Relatórios de Turmas", "Relatórios de Alunos", "Relatórios de 
     render_license_footer()
 elif page == "Recibos de Fechamento (1ª Etapa)":
     render_receipt_frontend(logo_base64)
-    render_license_footer()
-elif page == "Relatórios de Alunos (Organizar por Turma)":
-    show_divisor_page(logo_base64)
-    render_license_footer()
-elif page == "Relatórios de Profissionais Escolares (Organizar por Turma)":
-    show_divisor_prof_page(logo_base64)
     render_license_footer()
