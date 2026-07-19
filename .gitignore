@@ -2,7 +2,7 @@
 __pycache__/
 *.pyc
 .streamlit/secrets.toml
-apps/web_scrapling/docs/credenciais.json
+apps/coleta_cadastros_escolas/docs/credenciais.json
 credenciais.json
 docs_temporarios/
 .DS_Store

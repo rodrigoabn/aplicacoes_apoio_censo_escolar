@@ -75,7 +75,7 @@ def sheet_column_index(model: dict[str, list[str]], sheet: str, label: str) -> i
 def resolve_sheet_name(site_tab: str) -> str:
     """Devolve o nome da aba no modelo a partir do nome usado no scraper."""
     # Há apenas uma aba ("Vínculo do gestor"); mantido para simetria com o
-    # padrão do web_scrapling.
+    # padrão do coleta_cadastros_escolas.
     return site_tab or GESTOR_SHEET
 
 

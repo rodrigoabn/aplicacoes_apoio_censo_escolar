@@ -230,7 +230,7 @@ def _is_escola_fechada(page: Page) -> bool:
 
 def _open_school_ficha(page: Page, codigo_inep: str, tentativas: int = 3) -> bool:
     """Busca a escola pelo código e abre a ficha (leitura). Reutiliza o fluxo
-    do web_scrapling para fixar o contexto da escola na sessão.
+    do coleta_cadastros_escolas para fixar o contexto da escola na sessão.
 
     Robusto contra o loader travar (retry de navegação) e contra a sessão
     expirar no meio do caminho (levanta `SessaoExpirada`)."""
@@ -484,7 +484,7 @@ def _scrape_gestor_vinculo(page: Page, codigo_inep: str, nome_unidade: str) -> d
 def _scrape_gestor_edit_form(page: Page, codigo_inep: str, nome_unidade: str) -> dict[str, dict]:
     """Fase B — abre o formulário de cadastro do gestor (ícone 'edit') e coleta
     as abas 'Identificação' e 'Dados pessoais' (e quaisquer outras abas
-    existentes no formulário), espelhando o padrão do web_scrapling.
+    existentes no formulário), espelhando o padrão do coleta_cadastros_escolas.
 
     Retorna {nome_da_aba: {coluna: valor}}. Não altera nenhum dado (modo
     leitura). Ao final, clica em 'Cancelar' para fechar o formulário.
@@ -603,7 +603,7 @@ def scrape_gestor_school(page: Page, codigo_inep: str, nome_unidade: str) -> dic
         result[sh]["Código do Inep"] = codigo_inep
         result[sh]["Unidade Escolar"] = nome_unidade
 
-    # Fase 0: selecionar a escola (mesmos passos do web_scrapling) para fixar
+    # Fase 0: selecionar a escola (mesmos passos do coleta_cadastros_escolas) para fixar
     # o contexto da escola na sessão.
     try:
         _open_school_ficha(page, codigo_inep)

@@ -9,7 +9,7 @@ from apps.inicio.inicio import show_home_page
 # ---------------------------------------------------------------------------
 # Registro da aplicação "COLETA DE DADOS CADASTRAIS DAS ESCOLAS" como pacote importável (src)
 # ---------------------------------------------------------------------------
-_WEB_SCRAPING_PATH = Path(__file__).resolve().parent / "apps" / "web_scrapling"
+_WEB_SCRAPING_PATH = Path(__file__).resolve().parent / "apps" / "coleta_cadastros_escolas"
 if str(_WEB_SCRAPING_PATH) not in sys.path:
     sys.path.insert(0, str(_WEB_SCRAPING_PATH))
 

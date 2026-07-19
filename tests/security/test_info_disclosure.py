@@ -17,7 +17,7 @@ SENSITIVE_PATHS = [
     ".git/config",
     ".git/HEAD",
     "credenciais.json",
-    "apps/web_scrapling/docs/credenciais.json",
+    "apps/coleta_cadastros_escolas/docs/credenciais.json",
     ".streamlit/secrets.toml",
     "app.py",
     "requirements.txt",

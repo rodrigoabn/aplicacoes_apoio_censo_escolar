@@ -21,7 +21,7 @@ from playwright.sync_api import Browser, Page, TimeoutError as PlaywrightTimeout
 import src.modelo as modelo
 from src.auth import BASE_URL, READ_ONLY, _assert_read_only
 
-logger = logging.getLogger("web_scrapling")
+logger = logging.getLogger("coleta_cadastros_escolas")
 
 TAB_NAMES = [
     "Vinculação institucional e Convênio",
