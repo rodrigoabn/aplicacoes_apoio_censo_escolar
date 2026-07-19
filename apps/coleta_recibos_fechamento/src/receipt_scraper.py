@@ -43,6 +43,11 @@ class LoginFalhou(Exception):
     e o formulário de login continuou visível após a tentativa."""
 
 
+class SessaoExpirada(Exception):
+    """A sessão Keycloak expirou (ou a navegação caiu na tela de login) durante
+    a abertura da ficha. O chamador deve refazer o login e repetir."""
+
+
 def _assert_read_only() -> None:
     if not READ_ONLY:
         raise RuntimeError("MODO LEITURA violado: escrita no site proibida.")
@@ -142,12 +147,31 @@ def _accept_sigilo_if_present(page: Page) -> None:
     page.wait_for_timeout(3000)
 
 
-def _select_school(page: Page, codigo_inep: str) -> bool:
-    """Busca a escola pelo código e a seleciona (contexto de sessão)."""
+def _select_school(page: Page, codigo_inep: str, tentativas: int = 3) -> bool:
+    """Busca a escola pelo código e a seleciona (contexto de sessão).
+
+    Robusto contra o loader travar (retry de navegação) e contra a sessão
+    expirar no meio do caminho (levanta `SessaoExpirada`)."""
     _assert_read_only()
-    page.goto(f"{BASE_URL}/escola/pesquisar", wait_until="domcontentloaded", timeout=15000)
-    _wait_loader(page)
-    page.wait_for_selector("input[formcontrolname='codigoEscola']", timeout=15000)
+    last_exc: Exception | None = None
+    for _ in range(max(1, tentativas)):
+        try:
+            page.goto(f"{BASE_URL}/escola/pesquisar", wait_until="domcontentloaded", timeout=15000)
+            _wait_loader(page)
+            if _session_expirada(page):
+                raise SessaoExpirada()
+            page.wait_for_selector("input[formcontrolname='codigoEscola']", timeout=15000)
+            break
+        except SessaoExpirada:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            page.wait_for_timeout(1000)
+            continue
+    else:
+        if last_exc is not None:
+            raise last_exc
+
     page.fill("input[formcontrolname='codigoEscola']", codigo_inep)
     btn = page.locator("button:has-text('Pesquisar')").first
     if btn.count():
@@ -323,6 +347,24 @@ def run_receipt_scraping(
                              "motivo": "Recibo de fechamento indisponível"})
             if on_progress:
                 on_progress(i, len(escolas), codigo, nome, "Recibo de fechamento indisponível.")
+
+        except SessaoExpirada:
+            # Sessão caiu ao abrir a ficha. Re-loga e repete a mesma escola.
+            logger.warning(f"[{codigo}] Sessão expirada ao abrir a ficha. Re-logando e repetindo...")
+            try:
+                _login_and_read(page, login, senha)
+                if not _select_school(page, codigo):
+                    raise ReciboIndisponivel()
+                data = _download_receipt_pdf(context, page, receipt_url)
+                outputs.append((escola, data))
+                if on_progress:
+                    on_progress(i, len(escolas), codigo, nome, "concluído")
+            except Exception as exc2:  # noqa: BLE001
+                logger.error(f"[{codigo}] Falha após re-login: {exc2}")
+                failures.append({"codigo_inep": codigo, "nome_unidade": nome,
+                                 "motivo": f"Erro (após re-login): {exc2}"})
+                if on_progress:
+                    on_progress(i, len(escolas), codigo, nome, f"erro: {exc2}")
 
         except Exception as exc:  # noqa: BLE001
             logger.error(f"[{codigo}] Erro durante a coleta do recibo: {exc}")

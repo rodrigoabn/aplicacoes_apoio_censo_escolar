@@ -155,6 +155,11 @@ class LoginFalhou(Exception):
     e o formulário de login continuou visível após a tentativa."""
 
 
+class SessaoExpirada(Exception):
+    """A sessão Keycloak expirou (ou a navegação caiu na tela de login) durante
+    a abertura da ficha. O chamador deve refazer o login e repetir."""
+
+
 def _login_and_read(page: Page, login: str, senha: str) -> None:
     _assert_read_only()
     page.goto(f"{BASE_URL}/escola/pesquisar", wait_until="domcontentloaded", timeout=30000)
@@ -223,13 +228,32 @@ def _is_escola_fechada(page: Page) -> bool:
         return False
 
 
-def _open_school_ficha(page: Page, codigo_inep: str) -> bool:
+def _open_school_ficha(page: Page, codigo_inep: str, tentativas: int = 3) -> bool:
     """Busca a escola pelo código e abre a ficha (leitura). Reutiliza o fluxo
-    do web_scrapling para fixar o contexto da escola na sessão."""
+    do web_scrapling para fixar o contexto da escola na sessão.
+
+    Robusto contra o loader travar (retry de navegação) e contra a sessão
+    expirar no meio do caminho (levanta `SessaoExpirada`)."""
     _assert_read_only()
-    page.goto(f"{BASE_URL}/escola/pesquisar", wait_until="domcontentloaded", timeout=15000)
-    _wait_loader(page)
-    page.wait_for_selector("input[formcontrolname='codigoEscola']", timeout=15000)
+    last_exc: Exception | None = None
+    for _ in range(max(1, tentativas)):
+        try:
+            page.goto(f"{BASE_URL}/escola/pesquisar", wait_until="domcontentloaded", timeout=15000)
+            _wait_loader(page)
+            if _session_expirada(page):
+                raise SessaoExpirada()
+            page.wait_for_selector("input[formcontrolname='codigoEscola']", timeout=15000)
+            break
+        except SessaoExpirada:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            page.wait_for_timeout(1000)
+            continue
+    else:
+        if last_exc is not None:
+            raise last_exc
+
     page.fill("input[formcontrolname='codigoEscola']", codigo_inep)
     btn = page.locator("button:has-text('Pesquisar')").first
     if btn.count():
@@ -295,11 +319,23 @@ def _map_to_row(fields: list[dict], cols: list[str]) -> dict:
         if key in norm_map:
             row[norm_map[key]] = f["value"]
             continue
-        # 3. Substring (bidirecional, com comprimento mínimo)
+        # 3. Substring (bidirecional, com comprimento mínimo).
+        # Proteção contra falso positivo: evita que rótulos CURTOS (do site ou
+        # do modelo) cassem incidentalmente com rótulos LONGOs onde estão
+        # "escondidos" no meio. Ex.: "federal"/"estadual"/"municipal" (curtos)
+        # não devem sobrescrever o atributo "2 - Regulamentação/autorização...
+        # no conselho ou órgão municipal, estadual ou federal de educação".
         for colnorm, col in norm_map.items():
             if len(colnorm) < 6 or len(key) < 6:
                 continue
-            if colnorm in key or key in colnorm:
+            # Modelo contido no site: só se o rótulo do modelo for
+            # razoavelmente longo (não uma palavra curta solta).
+            if colnorm in key and len(colnorm) >= 10:
+                row[col] = f["value"]
+                break
+            # Site contido no modelo: só se o rótulo do site for
+            # razoavelmente longo (não uma palavra curta solta).
+            if key in colnorm and len(key) >= 10:
                 row[col] = f["value"]
                 break
     return row
@@ -571,6 +607,9 @@ def scrape_gestor_school(page: Page, codigo_inep: str, nome_unidade: str) -> dic
     # o contexto da escola na sessão.
     try:
         _open_school_ficha(page, codigo_inep)
+    except SessaoExpirada:
+        # Propaga para o loop refazer o login e repetir a escola.
+        raise
     except Exception:
         return result
 
@@ -672,6 +711,19 @@ def run_scraping(
             if on_progress:
                 on_progress(i, len(escolas), codigo, nome, "concluído")
 
+        except SessaoExpirada:
+            # Sessão caiu ao abrir a ficha. Re-loga e repete a mesma escola.
+            logger.warning(f"[{codigo}] Sessão expirada ao abrir a ficha. Re-logando e repetindo...")
+            try:
+                _login_and_read(page, login, senha)
+                dados = scrape_gestor_school(page, codigo, nome)
+                outputs.append((escola, dados))
+                if on_progress:
+                    on_progress(i, len(escolas), codigo, nome, "concluído")
+            except Exception as exc2:  # noqa: BLE001
+                logger.error(f"[{codigo}] Falha após re-login: {exc2}")
+                if on_progress:
+                    on_progress(i, len(escolas), codigo, nome, f"erro: {exc2}")
         except Exception as exc:  # noqa: BLE001
             logger.error(f"[{codigo}] Erro durante coleta: {exc}")
             if on_progress:
